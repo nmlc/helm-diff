@@ -73,7 +73,7 @@ dist:
 	tar -C build/ -zcvf $(CURDIR)/release/helm-diff-windows.tgz diff/
 
 .PHONY: release
-release: lint dist
+release: dist
 ifndef GITHUB_TOKEN
 	$(error GITHUB_TOKEN is undefined)
 endif

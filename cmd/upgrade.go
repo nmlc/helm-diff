@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -36,6 +35,8 @@ type diffCmd struct {
 	suppressedKinds          []string
 	outputContext            int
 	showSecrets              bool
+	ignore                   diff.IgnoreManifest
+	ignoreMultipart          diff.IgnoreManifests
 	postRenderer             string
 	output                   string
 	install                  bool
@@ -117,6 +118,8 @@ func newChartCommand() *cobra.Command {
 	f.BoolVar(&diff.dryRun, "dry-run", false, "disables cluster access and show diff as if it was install. Implies --install, --reset-values, and --disable-validation")
 	f.StringVar(&diff.postRenderer, "post-renderer", "", "the path to an executable to be used for post rendering. If it exists in $PATH, the binary will be used, otherwise it will try to look for the executable at the given path")
 	f.StringVar(&diff.output, "output", "diff", "Possible values: diff, simple, json, template. When set to \"template\", use the env var HELM_DIFF_TPL to specify the template.")
+	f.Var(&diff.ignore, "ignore", "TBD")
+	f.Var(&diff.ignoreMultipart, "ignoreMultipart", "TBD")
 	if !isHelm3() {
 		f.StringVar(&diff.namespace, "namespace", "default", "namespace to assume the release to be installed into")
 	}
@@ -184,15 +187,21 @@ func (d *diffCmd) runHelm3() error {
 	} else {
 		newSpecs = manifest.Parse(string(installManifest), d.namespace, helm3TestHook, helm2TestSuccessHook)
 	}
-	seenAnyChanges := diff.Manifests(currentSpecs, newSpecs, d.suppressedKinds, d.showSecrets, d.outputContext, d.output, os.Stdout)
+	seenAnyChanges, ignoredAnyChanges := diff.Manifests(
+		currentSpecs,
+		newSpecs,
+		d.suppressedKinds,
+		d.showSecrets,
+		d.outputContext,
+		d.ignore,
+		d.ignoreMultipart,
+		d.output,
+		os.Stdout,
+	)
 
-	if d.detailedExitCode && seenAnyChanges {
-		return Error{
-			error: errors.New("identified at least one change, exiting with non-zero exit code (detailed-exitcode parameter enabled)"),
-			Code:  2,
-		}
+	if d.detailedExitCode {
+		return handleDetailedExitCode(seenAnyChanges, ignoredAnyChanges)
 	}
-
 	return nil
 }
 
@@ -270,14 +279,20 @@ func (d *diffCmd) run() error {
 		}
 	}
 
-	seenAnyChanges := diff.Manifests(currentSpecs, newSpecs, d.suppressedKinds, d.showSecrets, d.outputContext, d.output, os.Stdout)
+	seenAnyChanges, ignoredAnyChanges := diff.Manifests(
+		currentSpecs,
+		newSpecs,
+		d.suppressedKinds,
+		d.showSecrets,
+		d.outputContext,
+		d.ignore,
+		d.ignoreMultipart,
+		d.output,
+		os.Stdout,
+	)
 
-	if d.detailedExitCode && seenAnyChanges {
-		return Error{
-			error: errors.New("identified at least one change, exiting with non-zero exit code (detailed-exitcode parameter enabled)"),
-			Code:  2,
-		}
+	if d.detailedExitCode {
+		return handleDetailedExitCode(seenAnyChanges, ignoredAnyChanges)
 	}
-
 	return nil
 }

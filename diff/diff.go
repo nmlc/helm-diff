@@ -19,9 +19,20 @@ import (
 )
 
 // Manifests diff on manifests
-func Manifests(oldIndex, newIndex map[string]*manifest.MappingResult, suppressedKinds []string, showSecrets bool, context int, output string, to io.Writer) bool {
+func Manifests(
+	oldIndex, newIndex map[string]*manifest.MappingResult,
+	suppressedKinds []string,
+	showSecrets bool,
+	context int,
+	ignoreAll IgnoreManifest,
+	ignoreSpecific IgnoreManifests,
+	output string,
+	to io.Writer,
+) (seenAnyChanges, ignoredAnyChanges bool) {
+	seenAnyChanges = false
+	ignoredAnyChanges = false
+
 	report.setupReportFormat(output)
-	seenAnyChanges := false
 	emptyMapping := &manifest.MappingResult{}
 	for _, key := range sortedKeys(oldIndex) {
 		oldContent := oldIndex[key]
@@ -33,11 +44,15 @@ func Manifests(oldIndex, newIndex map[string]*manifest.MappingResult, suppressed
 					redactSecrets(oldContent, newContent)
 				}
 
+				// I should perform diff no matter what, because I want ignore notification return code
 				diffs := diffMappingResults(oldContent, newContent)
-				if len(diffs) > 0 {
-					seenAnyChanges = true
+
+				// here I should already know ignoreRegex, ignoreSingleModification
+				seenAnyChanges, ignoredAnyChanges = ignoreModifications(newContent.Name, ignoreAll, ignoreSpecific, diffs)
+
+				if seenAnyChanges {
+					report.addEntry(key, suppressedKinds, oldContent.Kind, context, diffs, "MODIFY")
 				}
-				report.addEntry(key, suppressedKinds, oldContent.Kind, context, diffs, "MODIFY")
 			}
 		} else {
 			// removed
@@ -70,7 +85,7 @@ func Manifests(oldIndex, newIndex map[string]*manifest.MappingResult, suppressed
 	}
 	report.print(to)
 	report.clean()
-	return seenAnyChanges
+	return seenAnyChanges, ignoredAnyChanges
 }
 
 func redactSecrets(old, new *manifest.MappingResult) {
@@ -142,10 +157,19 @@ func getComment(s string) string {
 }
 
 // Releases reindex the content  based on the template names and pass it to Manifests
-func Releases(oldIndex, newIndex map[string]*manifest.MappingResult, suppressedKinds []string, showSecrets bool, context int, output string, to io.Writer) bool {
+func Releases(
+	oldIndex, newIndex map[string]*manifest.MappingResult,
+	suppressedKinds []string,
+	showSecrets bool,
+	context int,
+	output string,
+	ignoreAll IgnoreManifest,
+	ignoreSpecific IgnoreManifests,
+	to io.Writer,
+) (seenAnyChanges, ignoredAnyChanges bool) {
 	oldIndex = reIndexForRelease(oldIndex)
 	newIndex = reIndexForRelease(newIndex)
-	return Manifests(oldIndex, newIndex, suppressedKinds, showSecrets, context, output, to)
+	return Manifests(oldIndex, newIndex, suppressedKinds, showSecrets, context, ignoreAll, ignoreSpecific, output, to)
 }
 
 func diffMappingResults(oldContent *manifest.MappingResult, newContent *manifest.MappingResult) []difflib.DiffRecord {

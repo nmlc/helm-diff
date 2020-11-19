@@ -20,6 +20,8 @@ type release struct {
 	outputContext    int
 	includeTests     bool
 	showSecrets      bool
+	ignore           diff.IgnoreManifest
+	ignoreMultipart  diff.IgnoreManifests
 	output           string
 }
 
@@ -79,6 +81,8 @@ func releaseCmd() *cobra.Command {
 	releaseCmd.Flags().IntVarP(&diff.outputContext, "context", "C", -1, "output NUM lines of context around changes")
 	releaseCmd.Flags().BoolVar(&diff.includeTests, "include-tests", false, "enable the diffing of the helm test hooks")
 	releaseCmd.Flags().StringVar(&diff.output, "output", "diff", "Possible values: diff, simple, template. When set to \"template\", use the env var HELM_DIFF_TPL to specify the template.")
+	releaseCmd.Flags().Var(&diff.ignore, "ignore", "TBD")
+	releaseCmd.Flags().Var(&diff.ignoreMultipart, "ignoreMultipart", "TBD")
 
 	releaseCmd.SuggestionsMinimumDistance = 1
 
@@ -114,20 +118,20 @@ func (d *release) differentiateHelm3() error {
 	}
 
 	if releaseChart1 == releaseChart2 {
-		seenAnyChanges := diff.Releases(
+		seenAnyChanges, ignoredAnyChanges := diff.Releases(
 			manifest.Parse(string(releaseResponse1), namespace, excludes...),
 			manifest.Parse(string(releaseResponse2), namespace, excludes...),
 			d.suppressedKinds,
 			d.showSecrets,
 			d.outputContext,
 			d.output,
-			os.Stdout)
+			d.ignore,
+			d.ignoreMultipart,
+			os.Stdout,
+		)
 
-		if d.detailedExitCode && seenAnyChanges {
-			return Error{
-				error: errors.New("identified at least one change, exiting with non-zero exit code (detailed-exitcode parameter enabled)"),
-				Code:  2,
-			}
+		if d.detailedExitCode {
+			return handleDetailedExitCode(seenAnyChanges, ignoredAnyChanges)
 		}
 	} else {
 		fmt.Printf("Error : Incomparable Releases \n Unable to compare releases from two different charts \"%s\", \"%s\". \n try helm diff release --help to know more \n", releaseChart1, releaseChart2)
@@ -148,20 +152,20 @@ func (d *release) differentiate() error {
 	}
 
 	if releaseResponse1.Release.Chart.Metadata.Name == releaseResponse2.Release.Chart.Metadata.Name {
-		seenAnyChanges := diff.Releases(
+		seenAnyChanges, ignoredAnyChanges := diff.Releases(
 			manifest.ParseRelease(releaseResponse1.Release, d.includeTests),
 			manifest.ParseRelease(releaseResponse2.Release, d.includeTests),
 			d.suppressedKinds,
 			d.showSecrets,
 			d.outputContext,
 			d.output,
-			os.Stdout)
+			d.ignore,
+			d.ignoreMultipart,
+			os.Stdout,
+		)
 
-		if d.detailedExitCode && seenAnyChanges {
-			return Error{
-				error: errors.New("identified at least one change, exiting with non-zero exit code (detailed-exitcode parameter enabled)"),
-				Code:  2,
-			}
+		if d.detailedExitCode {
+			return handleDetailedExitCode(seenAnyChanges, ignoredAnyChanges)
 		}
 	} else {
 		fmt.Printf("Error : Incomparable Releases \n Unable to compare releases from two different charts \"%s\", \"%s\". \n try helm diff release --help to know more \n", releaseResponse1.Release.Chart.Metadata.Name, releaseResponse2.Release.Chart.Metadata.Name)

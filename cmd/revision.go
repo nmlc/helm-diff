@@ -22,6 +22,8 @@ type revision struct {
 	outputContext    int
 	includeTests     bool
 	showSecrets      bool
+	ignore           diff.IgnoreManifest
+	ignoreMultipart  diff.IgnoreManifests
 	output           string
 }
 
@@ -89,6 +91,8 @@ func revisionCmd() *cobra.Command {
 	revisionCmd.Flags().IntVarP(&diff.outputContext, "context", "C", -1, "output NUM lines of context around changes")
 	revisionCmd.Flags().BoolVar(&diff.includeTests, "include-tests", false, "enable the diffing of the helm test hooks")
 	revisionCmd.Flags().StringVar(&diff.output, "output", "diff", "Possible values: diff, simple, template. When set to \"template\", use the env var HELM_DIFF_TPL to specify the template.")
+	revisionCmd.Flags().Var(&diff.ignore, "ignore", "TBD")
+	revisionCmd.Flags().Var(&diff.ignoreMultipart, "ignoreMultipart", "TBD")
 
 	revisionCmd.SuggestionsMinimumDistance = 1
 
@@ -125,8 +129,11 @@ func (d *revision) differentiateHelm3() error {
 			d.suppressedKinds,
 			d.showSecrets,
 			d.outputContext,
+			d.ignore,
+			d.ignoreMultipart,
 			d.output,
-			os.Stdout)
+			os.Stdout,
+		)
 
 	case 2:
 		revision1, _ := strconv.Atoi(d.revisions[0])
@@ -145,20 +152,20 @@ func (d *revision) differentiateHelm3() error {
 			return prettyError(err)
 		}
 
-		seenAnyChanges := diff.Manifests(
+		seenAnyChanges, ignoredAnyChanges := diff.Manifests(
 			manifest.Parse(string(revisionResponse1), namespace, excludes...),
 			manifest.Parse(string(revisionResponse2), namespace, excludes...),
 			d.suppressedKinds,
 			d.showSecrets,
 			d.outputContext,
+			d.ignore,
+			d.ignoreMultipart,
 			d.output,
-			os.Stdout)
+			os.Stdout,
+		)
 
-		if d.detailedExitCode && seenAnyChanges {
-			return Error{
-				error: errors.New("identified at least one change, exiting with non-zero exit code (detailed-exitcode parameter enabled)"),
-				Code:  2,
-			}
+		if d.detailedExitCode {
+			return handleDetailedExitCode(seenAnyChanges, ignoredAnyChanges)
 		}
 
 	default:
@@ -190,8 +197,11 @@ func (d *revision) differentiate() error {
 			d.suppressedKinds,
 			d.showSecrets,
 			d.outputContext,
+			d.ignore,
+			d.ignoreMultipart,
 			d.output,
-			os.Stdout)
+			os.Stdout,
+		)
 
 	case 2:
 		revision1, _ := strconv.Atoi(d.revisions[0])
@@ -210,20 +220,20 @@ func (d *revision) differentiate() error {
 			return prettyError(err)
 		}
 
-		seenAnyChanges := diff.Manifests(
+		seenAnyChanges, ignoredAnyChanges := diff.Manifests(
 			manifest.ParseRelease(revisionResponse1.Release, d.includeTests),
 			manifest.ParseRelease(revisionResponse2.Release, d.includeTests),
 			d.suppressedKinds,
 			d.showSecrets,
 			d.outputContext,
+			d.ignore,
+			d.ignoreMultipart,
 			d.output,
-			os.Stdout)
+			os.Stdout,
+		)
 
-		if d.detailedExitCode && seenAnyChanges {
-			return Error{
-				error: errors.New("identified at least one change, exiting with non-zero exit code (detailed-exitcode parameter enabled)"),
-				Code:  2,
-			}
+		if d.detailedExitCode {
+			return handleDetailedExitCode(seenAnyChanges, ignoredAnyChanges)
 		}
 
 	default:

@@ -20,6 +20,9 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.5.1
+	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
+	golang.org/x/tools v0.0.0-20201118215654-4d9c4f8a78b0 // indirect
+	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 	google.golang.org/grpc v1.30.0
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.18.6

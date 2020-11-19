@@ -36,7 +36,6 @@ var text2 = "" +
 	"line10"
 
 func TestPrintDiffWithContext(t *testing.T) {
-
 	t.Run("context-disabled", func(t *testing.T) {
 		assertDiff(t, text1, text2, -1, ""+
 			"- line1\n"+
@@ -129,6 +128,8 @@ func assertDiff(t *testing.T, before, after string, context int, expected string
 }
 
 func TestManifests(t *testing.T) {
+	ansi.DisableColors(true)
+
 	specBeta := map[string]*manifest.MappingResult{
 		"default, nginx, Deployment (apps)": {
 
@@ -159,9 +160,9 @@ metadata:
 
 		var buf1 bytes.Buffer
 
-		if changesSeen := Manifests(specBeta, specRelease, []string{}, true, 10, "diff", &buf1); !changesSeen {
-			t.Error("Unexpected return value from Manifests: Expected the return value to be `true` to indicate that it has seen any change(s), but was `false`")
-		}
+		changesSeen, changesIgnored := Manifests(specBeta, specRelease, []string{}, true, 10, IgnoreManifest{}, IgnoreManifests{}, "diff", &buf1)
+
+		assertManifestsReturnValues(t, changesSeen, true, changesIgnored, false)
 
 		require.Equal(t, `default, nginx, Deployment (apps) has changed:
   
@@ -177,9 +178,9 @@ metadata:
 	t.Run("OnNoChange", func(t *testing.T) {
 		var buf2 bytes.Buffer
 
-		if changesSeen := Manifests(specRelease, specRelease, []string{}, true, 10, "diff", &buf2); changesSeen {
-			t.Error("Unexpected return value from Manifests: Expected the return value to be `false` to indicate that it has NOT seen any change(s), but was `true`")
-		}
+		changesSeen, changesIgnored := Manifests(specRelease, specRelease, []string{}, true, 10, IgnoreManifest{}, IgnoreManifests{}, "diff", &buf2)
+
+		assertManifestsReturnValues(t, changesSeen, false, changesIgnored, false)
 
 		require.Equal(t, ``, buf2.String())
 	})
@@ -188,7 +189,7 @@ metadata:
 
 		var buf1 bytes.Buffer
 
-		if changesSeen := Manifests(specBeta, specRelease, []string{}, true, 10, "simple", &buf1); !changesSeen {
+		if changesSeen, _ := Manifests(specBeta, specRelease, []string{}, true, 10, IgnoreManifest{}, IgnoreManifests{}, "simple", &buf1); !changesSeen {
 			t.Error("Unexpected return value from Manifests: Expected the return value to be `true` to indicate that it has seen any change(s), but was `false`")
 		}
 
@@ -200,7 +201,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
 	t.Run("OnNoChangeSimple", func(t *testing.T) {
 		var buf2 bytes.Buffer
 
-		if changesSeen := Manifests(specRelease, specRelease, []string{}, true, 10, "simple", &buf2); changesSeen {
+		if changesSeen, _ := Manifests(specRelease, specRelease, []string{}, true, 10, IgnoreManifest{}, IgnoreManifests{}, "simple", &buf2); changesSeen {
 			t.Error("Unexpected return value from Manifests: Expected the return value to be `false` to indicate that it has NOT seen any change(s), but was `true`")
 		}
 
@@ -211,7 +212,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
 
 		var buf1 bytes.Buffer
 
-		if changesSeen := Manifests(specBeta, specRelease, []string{}, true, 10, "template", &buf1); !changesSeen {
+		if changesSeen, _ := Manifests(specBeta, specRelease, []string{}, true, 10, IgnoreManifest{}, IgnoreManifests{}, "template", &buf1); !changesSeen {
 			t.Error("Unexpected return value from Manifests: Expected the return value to be `true` to indicate that it has seen any change(s), but was `false`")
 		}
 
@@ -229,7 +230,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
 
 		var buf1 bytes.Buffer
 
-		if changesSeen := Manifests(specBeta, specRelease, []string{}, true, 10, "json", &buf1); !changesSeen {
+		if changesSeen, _ := Manifests(specBeta, specRelease, []string{}, true, 10, IgnoreManifest{}, IgnoreManifests{}, "json", &buf1); !changesSeen {
 			t.Error("Unexpected return value from Manifests: Expected the return value to be `true` to indicate that it has seen any change(s), but was `false`")
 		}
 
@@ -246,7 +247,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
 	t.Run("OnNoChangeTemplate", func(t *testing.T) {
 		var buf2 bytes.Buffer
 
-		if changesSeen := Manifests(specRelease, specRelease, []string{}, true, 10, "template", &buf2); changesSeen {
+		if changesSeen, _ := Manifests(specRelease, specRelease, []string{}, true, 10, IgnoreManifest{}, IgnoreManifests{}, "template", &buf2); changesSeen {
 			t.Error("Unexpected return value from Manifests: Expected the return value to be `false` to indicate that it has NOT seen any change(s), but was `true`")
 		}
 
@@ -256,7 +257,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
 	t.Run("OnChangeCustomTemplate", func(t *testing.T) {
 		var buf1 bytes.Buffer
 		os.Setenv("HELM_DIFF_TPL", "testdata/customTemplate.tpl")
-		if changesSeen := Manifests(specBeta, specRelease, []string{}, true, 10, "template", &buf1); !changesSeen {
+		if changesSeen, _ := Manifests(specBeta, specRelease, []string{}, true, 10, IgnoreManifest{}, IgnoreManifests{}, "template", &buf1); !changesSeen {
 			t.Error("Unexpected return value from Manifests: Expected the return value to be `false` to indicate that it has NOT seen any change(s), but was `true`")
 		}
 
