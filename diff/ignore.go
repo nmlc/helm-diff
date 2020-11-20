@@ -14,7 +14,7 @@ type IgnoreManifest struct {
 }
 
 func (im *IgnoreManifest) String() string {
-	return fmt.Sprintf("%+v", im)
+	return fmt.Sprintf("%+v", &im)
 }
 
 func (im *IgnoreManifest) Type() string {
@@ -36,7 +36,7 @@ type IgnoreManifests []struct {
 }
 
 func (im *IgnoreManifests) String() string {
-	return fmt.Sprintf("%+v", im)
+	return fmt.Sprintf("%+v", &im)
 }
 
 func (im *IgnoreManifests) Type() string {
